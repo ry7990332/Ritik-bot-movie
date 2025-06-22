@@ -33,7 +33,7 @@ def smart_movie_search(query):
             url = a['href']
             if query_lower in title.lower():
                 found.append((title, url))
-        if len(found) >= 5:
+        if len(found) >= 10:
             break
 
     return found
