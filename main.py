@@ -14,35 +14,36 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🎬 Send any movie name to get Watch/Download link from PRMovies.\n\n👨‍💻 Made by Ritik Yadav"
     )
 
-def search_prmovies(query):
-    search_url = f"{PRMOVIE_URL}/?s={query.replace(' ', '+')}"
+def smart_movie_search(query):
     headers = {
         "User-Agent": "Mozilla/5.0"
     }
-    res = requests.get(search_url, headers=headers)
-
+    # Scrape latest movies page instead of search
+    res = requests.get(PRMOVIE_URL, headers=headers)
     soup = BeautifulSoup(res.text, "html.parser")
     results = soup.find_all("h2", class_="title")
 
-    links = []
+    query_lower = query.lower()
+    found = []
+
     for r in results:
-        a_tag = r.find("a")
-        if a_tag:
-            title = a_tag.text.strip()
-            url = a_tag['href']
-            if "/movie/" in url:  # Optional filter
-                links.append((title, url))
-        if len(links) >= 3:
+        a = r.find("a")
+        if a:
+            title = a.text.strip()
+            url = a['href']
+            if query_lower in title.lower():
+                found.append((title, url))
+        if len(found) >= 5:
             break
 
-    return links
+    return found
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.message.text.strip()
-    movies = search_prmovies(query)
+    movies = smart_movie_search(query)
 
     if not movies:
-        await update.message.reply_text("❌ No results found. Try another movie name.")
+        await update.message.reply_text("❌ Movie not found. Try a different name.")
         return
 
     reply = f"🎬 *Results for:* `{query}`\n\n"
