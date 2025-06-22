@@ -5,46 +5,51 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 BOT_TOKEN = "7241333538:AAHGxIFsymBz46-vIv_hmfsz4GAXeRjdsg0"
+PRMOVIE_URL = "https://prmovies.credit"
 
 logging.basicConfig(level=logging.INFO)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🎬 Welcome to Ritik Movie Bot!\n\nSend any movie name and get Watch Online + Download links instantly.\n\n👨‍💻 Made by Ritik Yadav"
+        "🎬 Send any movie name to get Watch/Download link from PRMovies.\n\n👨‍💻 Made by Ritik Yadav"
     )
 
-def scrape_google_links(movie_name):
-    query = f"{movie_name} full movie in hindi watch online download"
-    url = f"https://www.google.com/search?q={query}"
+def search_prmovies(query):
+    search_url = f"{PRMOVIE_URL}/?s={query.replace(' ', '+')}"
     headers = {
         "User-Agent": "Mozilla/5.0"
     }
+    res = requests.get(search_url, headers=headers)
 
-    res = requests.get(url, headers=headers)
     soup = BeautifulSoup(res.text, "html.parser")
-    links = []
+    results = soup.find_all("h2", class_="title")
 
-    for g in soup.find_all('a'):
-        href = g.get('href')
-        if href and "/url?q=" in href and "webcache" not in href:
-            actual_url = href.split("/url?q=")[1].split("&")[0]
-            if any(site in actual_url for site in ["filmyzilla", "hdhub4u", "vegamovies", "moviesflix", "bollyflix"]):
-                links.append(actual_url)
+    links = []
+    for r in results:
+        a_tag = r.find("a")
+        if a_tag:
+            title = a_tag.text.strip()
+            url = a_tag['href']
+            if "/movie/" in url:  # Optional filter
+                links.append((title, url))
         if len(links) >= 3:
             break
 
-    return links if links else ["https://www.google.com/search?q=" + query.replace(" ", "+")]
+    return links
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    movie_name = update.message.text.strip()
-    links = scrape_google_links(movie_name)
+    query = update.message.text.strip()
+    movies = search_prmovies(query)
 
-    reply = f"🎬 *{movie_name}*\n\n🔗 Watch / Download Links:\n"
-    for i, link in enumerate(links, 1):
-        reply += f"{i}. [Link {i}]({link})\n"
+    if not movies:
+        await update.message.reply_text("❌ No results found. Try another movie name.")
+        return
+
+    reply = f"🎬 *Results for:* `{query}`\n\n"
+    for name, link in movies:
+        reply += f"🔗 [{name}]({link})\n"
 
     reply += "\n👨‍💻 *Made by Ritik Yadav*"
-
     await update.message.reply_markdown(reply)
 
 def main():
