@@ -1,62 +1,41 @@
 import logging
 import requests
-from bs4 import BeautifulSoup
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 BOT_TOKEN = "7241333538:AAHGxIFsymBz46-vIv_hmfsz4GAXeRjdsg0"
-PRMOVIE_URL = "https://prmovies.credit"
+PRMOVIE_BASE = "https://prmovies.credit"
 
 logging.basicConfig(level=logging.INFO)
 
+def format_movie_url(name):
+    name = name.lower().replace(" ", "-")
+    return f"{PRMOVIE_BASE}/{name}-Watch-online-full-movie/"
+
+def check_url_exists(url):
+    try:
+        res = requests.head(url, allow_redirects=True, timeout=5)
+        return res.status_code == 200
+    except:
+        return False
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🎬 Send any movie name to get Watch/Download link from PRMovies.\n\n👨‍💻 Made by Ritik Yadav"
-    )
+    await update.message.reply_text("🎬 Send any movie name. I'll find the PRMovies link.\n\n👨‍💻 Made by Ritik Yadav")
 
-def smart_movie_search(query):
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
-    # Scrape latest movies page instead of search
-    res = requests.get(PRMOVIE_URL, headers=headers)
-    soup = BeautifulSoup(res.text, "html.parser")
-    results = soup.find_all("h2", class_="title")
-
-    query_lower = query.lower()
-    found = []
-
-    for r in results:
-        a = r.find("a")
-        if a:
-            title = a.text.strip()
-            url = a['href']
-            if query_lower in title.lower():
-                found.append((title, url))
-        if len(found) >= 10:
-            break
-
-    return found
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.message.text.strip()
-    movies = smart_movie_search(query)
+    movie_url = format_movie_url(query)
 
-    if not movies:
-        await update.message.reply_text("❌ Movie not found. Try a different name.")
-        return
-
-    reply = f"🎬 *Results for:* `{query}`\n\n"
-    for name, link in movies:
-        reply += f"🔗 [{name}]({link})\n"
-
-    reply += "\n👨‍💻 *Made by Ritik Yadav*"
-    await update.message.reply_markdown(reply)
+    if check_url_exists(movie_url):
+        reply = f"🎬 *{query.title()}*\n\n🔗 [Watch / Download Here]({movie_url})\n\n👨‍💻 *Made by Ritik Yadav*"
+        await update.message.reply_markdown(reply)
+    else:
+        await update.message.reply_text("❌ Movie not found on PRMovies. Check spelling or try a different title.")
 
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
     app.run_polling()
 
 if __name__ == "__main__":
